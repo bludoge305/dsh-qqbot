@@ -44,18 +44,34 @@ onebot-shim（本目录 server.mjs）   ── WS 3001 / HTTP 3000 ──▶  �
 **必须设 `followDiscoveredEndpoint: false`**（如果上游会自愈端点）：否则它会用自己的
 端点探测覆盖掉你配的 wsUrl 并写回配置，shim 就丢了。
 
+## 多账号
+
+一个 shim 可以接多个机器人实例（`im-qqbot-2`、`im-qqbot-3`…）。要点是
+**openid 按 AppID 隔离** —— 同一个人、同一个群，在不同机器人下的 openid 完全不同，
+所以映射表和出站都必须带 `appId`：
+
+- 映射表键是 `<appId>:<openid>`（老的裸 openid 键按默认账号读，能平滑升级）；
+- 出站按伪 id 反查 `{appId, openid}`，再用该账号的 `ns` 发送；
+- 被动窗口表挂在 `globalThis`，请求体带 `appId` / `dataRoot`，handler 按 `dataRoot`
+  精确挑 manager（同一份扩展装进多个 dataRoot 会被加载多份，路由表同键、后注册覆盖前者）。
+
+**不要**给主人做「uid → 默认账号 openid」的特例：主人可能在每个号下都有独立 openid，
+硬绑默认号会让别的号收到的私聊被拿错号的 ns 去发，QQ 直接返回 400。
+
+参与接管的每个 dataRoot 都要复制一份 `inbound/onebot-shim.mjs`（扩展只在网关启动时扫描，
+放好后用 QQ 里的 `/tools-reload` 或重启客户端生效）。
+
 ## 环境变量
 
 全部通过环境变量给，仓库里不留任何 QQ 号 / openid：
 
 | 变量 | 说明 |
 | --- | --- |
-| `DSH_BASE_URL` | DSH 端口；不填则用 `DSH_WEB_URL`（DSH 桌面端会导出，重启后端口变化也能跟上），再退到 `http://127.0.0.1:9220` |
-| `QQBOT_NS` | 账号 settings ns（`GET /api/qqbot-settings/accounts` 里能查到） |
-| `QQBOT_ID` | 机器人 QQ 号 / appId |
-| `QQBOT_NAME` | 机器人昵称 |
-| `OWNER_QQ` | 主人 QQ 号（用于 openid → 整数 id 映射） |
-| `OWNER_OPENID` | 主人 openid |
+| `DSH_BASE_URL` | DSH 端口；不填则用 `DSH_WEB_URL`（DSH 桌面端会导出，重启后端口变化也能跟上），再退到 `http://127.0.0.1:9220`。运行中入站扩展会把当前的 `DSH_WEB_URL` 一起送进来，shim 收到就自动跟随，**换端口不用重启 shim** |
+| `QQBOT_ACCOUNTS` | 多号时一次给全：`'{"<appId>":{"ns":"im-qqbot-2","name":"Bot A"}}'`（首次运行种进 `state/accounts.json`，之后以该文件为准） |
+| `QQBOT_ID` / `QQBOT_NS` / `QQBOT_NAME` | 只有一个号时的简写（`ns` 可在 `GET /api/qqbot-settings/accounts` 里查到） |
+| `QQBOT_APPID` | 默认账号（不填则取账号表第一个） |
+| `QQBOT_OWNER_QQ` / `QQBOT_OWNER_OPENID` | 主人 QQ 号与它在**默认号**下的 openid。其余账号的主人 openid 由入站扩展的 `isOwner` 学到后记进 `state/accounts.json` |
 | `SHIM_HTTP_PORT` / `SHIM_WS_PORT` | 默认 3000 / 3001 |
 | `SHIM_EXT_ID` | 扩展 id，默认 `onebot-shim`（要和 inbound 扩展一致） |
 
@@ -78,3 +94,5 @@ onebot-shim（本目录 server.mjs）   ── WS 3001 / HTTP 3000 ──▶  �
 3. **`msgId` 得自己记**。入站扩展在早挂点 annihilate 掉消息后，debounce 不跑，
    `record.replyTarget.msgId` 永远是旧值。所以在 `onInbound` 里、任何 `await` 之前
    先把 `ctx.message.messageId` 存进 Map。
+4. **shim 挂掉时扩展必须放行**（`catch{}` 后照常 `next()`），否则插件自己也不回话。
+   代价是：那段时间消息由 dsh-qqbot 自己回，看起来像"接管没生效"。排查先看 shim 是否在跑。
