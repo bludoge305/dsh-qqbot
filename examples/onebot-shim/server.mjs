@@ -261,7 +261,8 @@ async function handleAction(action, p = {}) {
     case 'get_mini_app_ark':
       return null;
     case 'fetch_custom_face_detail':
-      return { data: [] };
+      // surfcore expects response.data itself to be an array; no QQ face API here, so return empty.
+      return [];
     default:
       log('unknown action: ' + action);
       return {};
