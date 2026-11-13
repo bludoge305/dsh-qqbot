@@ -25,7 +25,9 @@ const MSGS_FILE = path.join(STATE, 'messages.json');
 const LOG_FILE = path.join(STATE, 'shim.log');
 
 // ---- 全部走环境变量：这里有 QQ 号/openid，绝不能硬编码进仓库 ----
-const DSH = process.env.DSH_BASE_URL || 'http://127.0.0.1:9220';
+// DSH 桌面端每次重启都可能换端口，它会导出一个 DSH_WEB_URL；
+// 没有显式配置时跟着它走，否则重启一次 shim 就连不上（fetch failed）。
+const DSH = process.env.DSH_BASE_URL || process.env.DSH_WEB_URL || 'http://127.0.0.1:9220';
 const NS = process.env.QQBOT_NS || 'im-qqbot';
 const BOT_ID = Number(process.env.QQBOT_ID || 0);
 const BOT_NAME = process.env.QQBOT_NAME || 'QQ Bot';

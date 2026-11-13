@@ -50,7 +50,7 @@ onebot-shim（本目录 server.mjs）   ── WS 3001 / HTTP 3000 ──▶  �
 
 | 变量 | 说明 |
 | --- | --- |
-| `DSH_BASE_URL` | DSH 端口，默认 `http://127.0.0.1:9220` |
+| `DSH_BASE_URL` | DSH 端口；不填则用 `DSH_WEB_URL`（DSH 桌面端会导出，重启后端口变化也能跟上），再退到 `http://127.0.0.1:9220` |
 | `QQBOT_NS` | 账号 settings ns（`GET /api/qqbot-settings/accounts` 里能查到） |
 | `QQBOT_ID` | 机器人 QQ 号 / appId |
 | `QQBOT_NAME` | 机器人昵称 |
